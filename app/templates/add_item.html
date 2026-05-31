@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Track a product — Nudgemate{% endblock %}
+{% block styles %}
+.add-wrap { max-width: 520px; margin: 0 auto; }
+.form-group { margin-bottom: 20px; }
+.hint { font-size: 12px; color: var(--muted); margin-top: 6px; }
+{% endblock %}
+{% block content %}
+<div class="container">
+  <div class="add-wrap">
+    <div class="page-header">
+      <div>
+        <h1 class="page-title">Track a product</h1>
+        <p class="page-subtitle">Paste any Amazon product URL</p>
+      </div>
+    </div>
+    {% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
+    <div class="card">
+      <form method="POST" action="/items/add">
+        <div class="form-group">
+          <label class="label">Amazon URL</label>
+          <input class="input" type="url" name="url" required placeholder="https://www.amazon.com/dp/..." value="{{ url or '' }}">
+          <p class="hint">Works with any amazon.com product link</p>
+        </div>
+        <div class="form-group">
+          <label class="label">Target Price (USD)</label>
+          <input class="input" type="number" name="target_price" required min="0.01" step="0.01" placeholder="99.99" value="{{ target_price or '' }}">
+          <p class="hint">We'll alert you when the price drops to or below this</p>
+        </div>
+        <div style="display:flex; gap:12px; margin-top:8px;">
+          <button class="btn btn-primary" type="submit">Start tracking</button>
+          <a href="/dashboard" class="btn btn-ghost">Cancel</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

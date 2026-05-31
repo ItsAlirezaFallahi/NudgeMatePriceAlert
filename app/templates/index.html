@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nudgemate — Price drop alerts that actually work</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root { --bg: #080808; --surface: #111111; --border: #222222; --border-light: #2a2a2a; --text: #e8e8e4; --muted: #666660; --faint: #333330; --accent: #c8f060; --accent-dim: #2a3a0a; --serif: 'Instrument Serif', Georgia, serif; --mono: 'DM Mono', monospace; --sans: 'DM Sans', sans-serif; }
+    html { scroll-behavior: smooth; }
+    body { font-family: var(--sans); background: var(--bg); color: var(--text); min-height: 100vh; overflow-x: hidden; -webkit-font-smoothing: antialiased; }
+    nav { position: fixed; top: 0; left: 0; right: 0; height: 56px; display: flex; align-items: center; justify-content: space-between; padding: 0 40px; border-bottom: 1px solid var(--border); background: rgba(8,8,8,0.92); backdrop-filter: blur(12px); z-index: 100; }
+    .nav-logo { font-family: var(--mono); font-size: 14px; color: var(--accent); }
+    .nav-right { display: flex; align-items: center; gap: 20px; }
+    .nav-right a { font-size: 13px; color: var(--muted); text-decoration: none; transition: color 0.15s; }
+    .nav-right a:hover { color: var(--text); }
+    .btn-nav { background: var(--accent); color: #080808; padding: 7px 16px; border-radius: 5px; font-size: 13px; font-weight: 500; text-decoration: none; }
+    .btn-nav:hover { background: #d8ff70; color: #080808 !important; }
+    .hero { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 120px 24px 80px; text-align: center; }
+    .hero-label { font-family: var(--mono); font-size: 11px; color: var(--accent); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 28px; opacity: 0; animation: fadeUp 0.6s ease 0.1s forwards; }
+    .live-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); margin-right: 6px; animation: pulse 2s ease infinite; }
+    .hero-title { font-family: var(--serif); font-size: clamp(48px, 8vw, 88px); font-weight: 400; line-height: 1.05; letter-spacing: -1.5px; max-width: 800px; margin-bottom: 28px; opacity: 0; animation: fadeUp 0.7s ease 0.2s forwards; }
+    .hero-title em { font-style: italic; color: var(--accent); }
+    .hero-sub { font-size: 17px; color: var(--muted); max-width: 440px; line-height: 1.65; font-weight: 300; margin-bottom: 44px; opacity: 0; animation: fadeUp 0.7s ease 0.35s forwards; }
+    .hero-cta { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; justify-content: center; opacity: 0; animation: fadeUp 0.7s ease 0.45s forwards; }
+    .btn-primary { background: var(--accent); color: #080808; padding: 13px 28px; border-radius: 6px; font-size: 14px; font-weight: 500; text-decoration: none; transition: all 0.15s; display: inline-flex; align-items: center; gap: 8px; }
+    .btn-primary:hover { background: #d8ff70; transform: translateY(-1px); box-shadow: 0 8px 24px rgba(200,240,96,0.2); }
+    .btn-ghost { color: var(--muted); font-size: 13px; text-decoration: none; transition: color 0.15s; }
+    .btn-ghost:hover { color: var(--text); }
+    .ticker-wrap { margin-top: 72px; width: 100%; max-width: 680px; opacity: 0; animation: fadeUp 0.7s ease 0.6s forwards; }
+    .ticker-label { font-family: var(--mono); font-size: 10px; color: var(--muted); letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 12px; text-align: left; }
+    .ticker { background: var(--surface); border: 1px solid var(--border-light); border-radius: 10px; overflow: hidden; }
+    .ticker-row { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 16px; padding: 14px 20px; border-bottom: 1px solid var(--border); font-size: 13px; }
+    .ticker-row:last-child { border-bottom: none; }
+    .ticker-price { font-family: var(--mono); font-size: 13px; color: var(--muted); white-space: nowrap; }
+    .ticker-drop { font-family: var(--mono); font-size: 12px; color: var(--accent); background: var(--accent-dim); padding: 3px 8px; border-radius: 4px; white-space: nowrap; }
+    .section { padding: 100px 24px; max-width: 1000px; margin: 0 auto; }
+    .section-label { font-family: var(--mono); font-size: 10px; color: var(--muted); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 16px; }
+    .section-title { font-family: var(--serif); font-size: clamp(32px, 5vw, 52px); font-weight: 400; letter-spacing: -0.8px; line-height: 1.1; margin-bottom: 64px; }
+    .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; }
+    .step { background: var(--surface); padding: 36px 32px; border: 1px solid var(--border); }
+    .step:first-child { border-radius: 10px 0 0 10px; }
+    .step:last-child { border-radius: 0 10px 10px 0; }
+    .step-num { font-family: var(--mono); font-size: 11px; color: var(--faint); margin-bottom: 20px; }
+    .step-icon { font-size: 28px; margin-bottom: 16px; display: block; }
+    .step-title { font-size: 16px; font-weight: 500; margin-bottom: 10px; }
+    .step-desc { font-size: 13px; color: var(--muted); line-height: 1.65; }
+    .features { display: grid; grid-template-columns: repeat(2, 1fr); gap: 2px; }
+    .feature { background: var(--surface); border: 1px solid var(--border); padding: 32px; }
+    .feature:nth-child(1) { border-radius: 10px 0 0 0; }
+    .feature:nth-child(2) { border-radius: 0 10px 0 0; }
+    .feature:nth-child(3) { border-radius: 0 0 0 10px; }
+    .feature:nth-child(4) { border-radius: 0 0 10px 0; }
+    .feature-icon { font-size: 22px; margin-bottom: 14px; display: block; }
+    .feature-title { font-size: 15px; font-weight: 500; margin-bottom: 8px; }
+    .feature-desc { font-size: 13px; color: var(--muted); line-height: 1.65; }
+    .pricing { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; max-width: 640px; }
+    .plan { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 32px; }
+    .plan.featured { border-color: var(--accent); position: relative; }
+    .plan-badge { position: absolute; top: -11px; left: 24px; background: var(--accent); color: #080808; font-size: 10px; font-weight: 500; font-family: var(--mono); padding: 3px 10px; border-radius: 4px; }
+    .plan-name { font-family: var(--mono); font-size: 11px; color: var(--muted); letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 12px; }
+    .plan-price { font-family: var(--serif); font-size: 44px; letter-spacing: -1px; line-height: 1; margin-bottom: 6px; }
+    .plan-period { font-size: 12px; color: var(--muted); margin-bottom: 24px; }
+    .plan-features { list-style: none; margin-bottom: 28px; }
+    .plan-features li { font-size: 13px; color: var(--muted); padding: 7px 0; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; }
+    .plan-features li:last-child { border-bottom: none; }
+    .plan-features li::before { content: '–'; color: var(--faint); font-family: var(--mono); }
+    .plan-features li.included::before { content: '✓'; color: var(--accent); }
+    .btn-plan { display: block; text-align: center; padding: 11px; border-radius: 6px; font-size: 13px; font-weight: 500; text-decoration: none; transition: all 0.15s; }
+    .btn-plan-primary { background: var(--accent); color: #080808; }
+    .btn-plan-primary:hover { background: #d8ff70; }
+    .btn-plan-ghost { border: 1px solid var(--border-light); color: var(--muted); }
+    .btn-plan-ghost:hover { border-color: var(--muted); color: var(--text); }
+    footer { border-top: 1px solid var(--border); padding: 32px 40px; display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: var(--muted); }
+    footer a { color: var(--muted); text-decoration: none; }
+    footer a:hover { color: var(--text); }
+    .reveal { opacity: 0; transform: translateY(20px); transition: opacity 0.6s ease, transform 0.6s ease; }
+    .reveal.visible { opacity: 1; transform: translateY(0); }
+    .divider-line { border: none; border-top: 1px solid var(--border); margin: 0; }
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+  </style>
+</head>
+<body>
+  <nav>
+    <span class="nav-logo">nudgemate</span>
+    <div class="nav-right">
+      <a href="#how">How it works</a>
+      <a href="#pricing">Pricing</a>
+      <a href="/login">Sign in</a>
+      <a href="/register" class="btn-nav">Get started free</a>
+    </div>
+  </nav>
+  <section class="hero">
+    <div class="hero-label"><span class="live-dot"></span>Watching prices right now</div>
+    <h1 class="hero-title">Stop refreshing.<br>Start <em>buying</em> at the<br>right price.</h1>
+    <p class="hero-sub">Paste an Amazon link, set your target. Nudgemate watches the price and alerts you the moment it drops — by email, Telegram, or web.</p>
+    <div class="hero-cta">
+      <a href="/register" class="btn-primary">Start tracking free <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg></a>
+      <a href="#how" class="btn-ghost">See how it works →</a>
+    </div>
+    <div class="ticker-wrap">
+      <div class="ticker-label">Recent drops detected</div>
+      <div class="ticker">
+        <div class="ticker-row"><span>Sony WH-1000XM5 Wireless Headphones</span><span class="ticker-price">$279 → $229</span><span class="ticker-drop">↓ $50</span></div>
+        <div class="ticker-row"><span>Apple AirPods Pro (2nd Gen)</span><span class="ticker-price">$249 → $189</span><span class="ticker-drop">↓ $60</span></div>
+        <div class="ticker-row"><span>Instant Pot Duo 7-in-1 6 Qt</span><span class="ticker-price">$99 → $69</span><span class="ticker-drop">↓ $30</span></div>
+      </div>
+    </div>
+  </section>
+  <hr class="divider-line">
+  <section class="section" id="how">
+    <div class="reveal">
+      <div class="section-label">How it works</div>
+      <h2 class="section-title">Three steps.<br>Zero effort.</h2>
+    </div>
+    <div class="steps reveal">
+      <div class="step"><div class="step-num">01</div><span class="step-icon">🔗</span><div class="step-title">Paste a link</div><div class="step-desc">Copy any Amazon product URL and paste it into Nudgemate. We extract the product automatically.</div></div>
+      <div class="step"><div class="step-num">02</div><span class="step-icon">🎯</span><div class="step-title">Set your target</div><div class="step-desc">Tell us what you're willing to pay. We check the price every few hours around the clock.</div></div>
+      <div class="step"><div class="step-num">03</div><span class="step-icon">🔔</span><div class="step-title">Get alerted</div><div class="step-desc">The moment the price drops below your target, we send you an alert with a direct buy link.</div></div>
+    </div>
+  </section>
+  <hr class="divider-line">
+  <section class="section">
+    <div class="reveal">
+      <div class="section-label">Features</div>
+      <h2 class="section-title">Built to be<br>dependable.</h2>
+    </div>
+    <div class="features reveal">
+      <div class="feature"><span class="feature-icon">📊</span><div class="feature-title">Price history charts</div><div class="feature-desc">See how a product's price has moved over time so you know if today's deal is actually a deal.</div></div>
+      <div class="feature"><span class="feature-icon">⏱️</span><div class="feature-title">Checks every 3 hours</div><div class="feature-desc">We poll Amazon regularly so you never miss a flash sale. Pro users get 30-minute checks.</div></div>
+      <div class="feature"><span class="feature-icon">🔕</span><div class="feature-title">No spam</div><div class="feature-desc">We send one alert per price drop — not a daily digest. You only hear from us when it matters.</div></div>
+      <div class="feature"><span class="feature-icon">⏸️</span><div class="feature-title">Pause anytime</div><div class="feature-desc">Going on holiday? Pause individual items or your whole account and resume when you're back.</div></div>
+    </div>
+  </section>
+  <hr class="divider-line">
+  <section class="section" id="pricing">
+    <div class="reveal">
+      <div class="section-label">Pricing</div>
+      <h2 class="section-title">Free to start.<br>Pro when you need it.</h2>
+    </div>
+    <div class="pricing reveal">
+      <div class="plan">
+        <div class="plan-name">Free</div><div class="plan-price">$0</div><div class="plan-period">forever</div>
+        <ul class="plan-features">
+          <li class="included">Track up to 5 items</li><li class="included">Email alerts</li><li class="included">Telegram alerts</li><li class="included">Price history charts</li><li>Checks every 3 hours</li><li>Instant alerts</li>
+        </ul>
+        <a href="/register" class="btn-plan btn-plan-ghost">Get started</a>
+      </div>
+      <div class="plan featured">
+        <div class="plan-badge">COMING SOON</div>
+        <div class="plan-name">Pro</div><div class="plan-price">$5</div><div class="plan-period">per month</div>
+        <ul class="plan-features">
+          <li class="included">Track up to 50 items</li><li class="included">Email alerts</li><li class="included">Telegram alerts</li><li class="included">Price history charts</li><li class="included">Checks every 30 minutes</li><li class="included">Instant alerts</li>
+        </ul>
+        <a href="/register" class="btn-plan btn-plan-primary">Join waitlist</a>
+      </div>
+    </div>
+  </section>
+  <hr class="divider-line">
+  <section class="section" style="text-align:center; padding-bottom:120px;">
+    <div class="reveal">
+      <div class="section-label">Get started</div>
+      <h2 class="section-title" style="margin-bottom:16px;">Your next deal<br>is already out there.</h2>
+      <p style="font-size:15px; color:var(--muted); margin-bottom:36px; max-width:360px; margin-left:auto; margin-right:auto; line-height:1.65;">Free forever. No credit card. Takes 30 seconds to set up your first alert.</p>
+      <a href="/register" class="btn-primary" style="font-size:15px; padding:14px 32px;">Start tracking free <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg></a>
+    </div>
+  </section>
+  <footer>
+    <span style="font-family:var(--mono); color:var(--accent);">nudgemate</span>
+    <div style="display:flex; gap:24px;"><a href="/login">Sign in</a><a href="/register">Register</a><a href="mailto:hi@nudgemate.net">Contact</a></div>
+    <span>© 2026 Nudgemate</span>
+  </footer>
+  <script>
+    const observer = new IntersectionObserver(entries => entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); observer.unobserve(e.target); } }), { threshold: 0.1 });
+    document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+  </script>
+</body>
+</html>

@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}{{ item.product_name or "Item" }} — Nudgemate{% endblock %}
+{% block styles %}
+.stat-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 28px; }
+.stat { background: var(--surface2); border-radius: 8px; padding: 16px; }
+.stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+.stat-value { font-size: 22px; font-weight: 600; font-family: var(--mono); }
+.stat-value.green { color: var(--accent); }
+.history-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.history-table th { text-align: left; padding: 8px 12px; font-size: 11px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border); }
+.history-table td { padding: 10px 12px; border-bottom: 1px solid var(--surface2); font-family: var(--mono); }
+.history-table tr:last-child td { border-bottom: none; }
+{% endblock %}
+{% block content %}
+<div class="container">
+  <div style="margin-bottom:24px;"><a href="/dashboard" style="font-size:13px; color:var(--muted);">← Dashboard</a></div>
+  <div class="page-header">
+    <div style="flex:1; min-width:0;">
+      <h1 class="page-title" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ item.product_name or item.asin }}</h1>
+      <p class="page-subtitle">ASIN: <span style="font-family:var(--mono)">{{ item.asin }}</span></p>
+    </div>
+    {% if item.affiliate_url %}<a href="{{ item.affiliate_url }}" target="_blank" class="btn btn-primary">Buy on Amazon ↗</a>{% endif %}
+  </div>
+  <div class="stat-row">
+    <div class="stat">
+      <div class="stat-label">Current Price</div>
+      <div class="stat-value {{ 'green' if item.current_price and item.current_price <= item.target_price }}">{{ "$%.2f"|format(item.current_price) if item.current_price else "—" }}</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Your Target</div>
+      <div class="stat-value">${{ "%.2f"|format(item.target_price) }}</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Lowest Ever</div>
+      <div class="stat-value green">{{ "$%.2f"|format(lowest) if lowest else "—" }}</div>
+    </div>
+  </div>
+  {% if history %}
+  <div class="card" style="margin-bottom:24px;">
+    <div style="font-size:12px; color:var(--muted); margin-bottom:12px; text-transform:uppercase; letter-spacing:0.5px;">Price History</div>
+    <canvas id="priceChart" style="width:100%; height:180px;"></canvas>
+  </div>
+  {% endif %}
+  <div class="card" style="margin-bottom:24px;">
+    <div style="font-size:12px; color:var(--muted); margin-bottom:16px; text-transform:uppercase; letter-spacing:0.5px;">Update Target Price</div>
+    <form method="POST" action="/items/{{ item.id }}/target" style="display:flex; gap:10px; align-items:flex-end;">
+      <div style="flex:1;"><input class="input" type="number" name="target_price" value="{{ item.target_price }}" min="0.01" step="0.01"></div>
+      <button class="btn btn-primary" type="submit">Update</button>
+    </form>
+  </div>
+  {% if history %}
+  <div class="card">
+    <div style="font-size:12px; color:var(--muted); margin-bottom:16px; text-transform:uppercase; letter-spacing:0.5px;">Recent Checks</div>
+    <table class="history-table">
+      <thead><tr><th>Date</th><th>Price</th><th></th></tr></thead>
+      <tbody>
+        {% for h in history[:20] %}
+        <tr>
+          <td style="color:var(--muted)">{{ h.checked_at.strftime('%b %d, %Y %H:%M') }}</td>
+          <td>${{ "%.2f"|format(h.price) }}</td>
+          <td>{% if h.price <= item.target_price %}<span class="badge badge-green">Below target</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+{% block scripts %}
+{% if history %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+  new Chart(document.getElementById('priceChart').getContext('2d'), {
+    type: 'line',
+    data: {
+      labels: {{ history_dates | tojson }},
+      datasets: [
+        { label: 'Price', data: {{ history_prices | tojson }}, borderColor: '#a3e635', backgroundColor: 'rgba(163,230,53,0.08)', borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#a3e635', tension: 0.3, fill: true },
+        { label: 'Target', data: Array({{ history_dates|length }}).fill({{ item.target_price | float }}), borderColor: '#3f3f46', borderDash: [4,4], borderWidth: 1, pointRadius: 0 }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#71717a', font: { size: 11 } }, grid: { color: '#27272a' } },
+        y: { ticks: { color: '#71717a', font: { size: 11 }, callback: v => '$' + v.toFixed(2) }, grid: { color: '#27272a' } }
+      }
+    }
+  });
+</script>
+{% endif %}
+{% endblock %}

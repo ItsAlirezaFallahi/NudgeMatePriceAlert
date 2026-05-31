@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Settings — Nudgemate{% endblock %}
+{% block styles %}
+.settings-section { margin-bottom: 32px; }
+.section-title { font-size: 12px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; }
+.link-box { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+{% endblock %}
+{% block content %}
+<div class="container" style="max-width:600px;">
+  <div class="page-header"><h1 class="page-title">Settings</h1></div>
+  {% if success %}<div class="flash flash-success">{{ success }}</div>{% endif %}
+  {% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
+  <div class="settings-section">
+    <div class="section-title">Account</div>
+    <div class="card">
+      <div style="font-size:13px; color:var(--muted); margin-bottom:4px;">Email</div>
+      <div style="font-family:var(--mono); margin-bottom:16px;">{{ current_user.email }}</div>
+      <div style="font-size:13px; color:var(--muted); margin-bottom:4px;">Plan</div>
+      <div>
+        {% if current_user.is_pro %}<span class="badge badge-green">Pro</span>
+        {% else %}<span class="badge badge-gray">Free</span><a href="/upgrade" style="font-size:12px; color:var(--accent); margin-left:10px;">Upgrade →</a>{% endif %}
+      </div>
+    </div>
+  </div>
+  <div class="settings-section">
+    <div class="section-title">Telegram</div>
+    <div class="link-box">
+      <div>
+        <div style="font-size:12px; color:var(--muted); margin-bottom:4px;">Status</div>
+        {% if current_user.telegram_chat_id %}
+        <div style="font-family:var(--mono); color:var(--accent);">✓ Linked{% if current_user.telegram_username %} (@{{ current_user.telegram_username }}){% endif %}</div>
+        {% else %}<div style="font-family:var(--mono); color:var(--muted);">Not connected</div>{% endif %}
+      </div>
+      {% if current_user.telegram_chat_id %}
+      <form method="POST" action="/settings/telegram/unlink"><button class="btn btn-danger" type="submit">Unlink</button></form>
+      {% else %}
+      <button class="btn btn-ghost" onclick="linkTelegram()">Connect Telegram</button>
+      {% endif %}
+    </div>
+    {% if not current_user.telegram_chat_id %}
+    <div id="telegram-link-box" style="display:none; margin-top:12px;">
+      <div class="card">
+        <p style="font-size:13px; color:var(--muted); margin-bottom:12px;">Click the link below to open Telegram and connect your account. Expires in 10 minutes.</p>
+        <a id="telegram-link-url" href="#" target="_blank" class="btn btn-primary">Open in Telegram →</a>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+  <div class="settings-section">
+    <div class="section-title">Danger Zone</div>
+    <div class="card" style="border-color:#7f1d1d;">
+      <div style="font-size:14px; font-weight:500; margin-bottom:6px;">Delete account</div>
+      <div style="font-size:13px; color:var(--muted); margin-bottom:16px;">Your data will be retained for recovery purposes.</div>
+      <form method="POST" action="/settings/delete-account" onsubmit="return confirm('Are you sure?')">
+        <button class="btn btn-danger" type="submit" style="border: 1px solid var(--red);">Delete my account</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+async function linkTelegram() {
+  try {
+    const res = await fetch('/telegram/link-token', { headers: { 'Authorization': 'Bearer ' + (document.cookie.match(/nm_token=([^;]+)/)||[])[1] } });
+    const data = await res.json();
+    document.getElementById('telegram-link-url').href = data.link_url;
+    document.getElementById('telegram-link-box').style.display = 'block';
+  } catch(e) { alert('Could not generate link. Please try again.'); }
+}
+</script>
+{% endblock %}
