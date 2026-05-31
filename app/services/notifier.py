@@ -100,18 +100,16 @@ async def send_telegram_alert(
     affiliate_url: str,
 ):
     from telegram import Bot
-    from telegram.constants import ParseMode
 
     savings = target_price - current_price
 
     message = (
-        f"🎯 *Price Drop Alert*\n\n"
-        f"*{escape_markdown(product_name[:100])}*\n\n"
-        f"💰 Current price: *${current_price:.2f}*\n"
-        f"🎯 Your target: *${target_price:.2f}*\n"
-        f"✅ You save: *${savings:.2f}*\n\n"
-        f"[Buy Now on Amazon]({affiliate_url})\n\n"
-        f"_Manage alerts at nudgemate\\.net_"
+        f"🎯 Price Drop Alert!\n\n"
+        f"{product_name[:100]}\n\n"
+        f"💰 Current price: ${current_price:.2f}\n"
+        f"🎯 Your target: ${target_price:.2f}\n"
+        f"✅ You save: ${savings:.2f}\n\n"
+        f"Buy Now: {affiliate_url}"
     )
 
     try:
@@ -119,8 +117,6 @@ async def send_telegram_alert(
         await bot.send_message(
             chat_id=chat_id,
             text=message,
-            parse_mode=ParseMode.MARKDOWN_V2,
-            disable_web_page_preview=False,
         )
         logger.info(f"Telegram alert sent to chat_id {chat_id}")
     except Exception as e:
