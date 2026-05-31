@@ -16,15 +16,17 @@ def extract_asin(url: str) -> str | None:
             return match.group(1)
     return None
 
+SHORT_LINK_DOMAINS = ["amzn.to", "amzn.com", "a.co"]
+
 async def resolve_and_extract_asin(url: str) -> str | None:
-    """Handle regular URLs and short amzn.to links"""
+    """Handle regular URLs and short Amazon links (amzn.to, a.co)"""
     # Try extracting directly first
     asin = extract_asin(url)
     if asin:
         return asin
 
-    # If no ASIN found, try following redirects (for amzn.to short links)
-    if "amzn.to" in url or "amzn.com" in url:
+    # If no ASIN found, try following redirects
+    if any(domain in url for domain in SHORT_LINK_DOMAINS):
         try:
             async with httpx.AsyncClient(
                 follow_redirects=True,

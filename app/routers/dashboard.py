@@ -1,5 +1,3 @@
-from math import asin
-
 from fastapi import APIRouter, Request, Depends, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -197,7 +195,7 @@ async def add_item_web(
             "error": msg, "url": url, "target_price": target_price,
         })
 
-    if "amazon.com" not in url and "amzn.to" not in url and "amzn.com" not in url:
+    if not any(d in url for d in ["amazon.com", "amzn.to", "amzn.com", "a.co"]):
         return render_error("Only Amazon URLs are supported right now")
 
     asin = await resolve_and_extract_asin(url)

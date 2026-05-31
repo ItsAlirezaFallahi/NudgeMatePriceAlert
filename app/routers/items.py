@@ -1,4 +1,3 @@
-from cmath import asin
 import logging
 import asyncio
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
@@ -65,7 +64,7 @@ async def add_item(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if "amazon.com" not in payload.url and "amzn.to" not in payload.url and "amzn.com" not in payload.url:
+    if not any(d in payload.url for d in ["amazon.com", "amzn.to", "amzn.com", "a.co"]):
         raise HTTPException(status_code=400, detail="Only Amazon URLs are supported right now")
 
     asin = await resolve_and_extract_asin(payload.url)
