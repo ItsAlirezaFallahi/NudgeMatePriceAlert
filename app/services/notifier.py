@@ -15,29 +15,41 @@ jinja_env = Environment(
 
 resend.api_key = settings.RESEND_API_KEY
 
-
 async def send_price_alert(
-    user: User,
-    item: TrackedItem,
-    current_price: Decimal,
+    user,
+    item,
+    current_price,
 ):
     import asyncio
     tasks = []
 
-    tasks.append(
-        send_email_alert(
-            to_email=user.email,
-            product_name=item.product_name or "Your tracked item",
-            current_price=current_price,
-            target_price=item.target_price,
-            affiliate_url=item.affiliate_url or item.url,
+    if user.notify_email:
+        tasks.append(
+            send_email_alert(
+                to_email=user.email,
+                product_name=item.product_name or "Your tracked item",
+                current_price=current_price,
+                target_price=item.target_price,
+                affiliate_url=item.affiliate_url or item.url,
+            )
         )
-    )
 
-    if user.telegram_chat_id:
+    if user.notify_telegram and user.telegram_chat_id:
         tasks.append(
             send_telegram_alert(
                 chat_id=user.telegram_chat_id,
+                product_name=item.product_name or "Your tracked item",
+                current_price=current_price,
+                target_price=item.target_price,
+                affiliate_url=item.affiliate_url or item.url,
+            )
+        )
+
+    if user.is_pro and user.notify_sms and user.phone_number and user.phone_verified:
+        from app.services.sms import send_sms_alert
+        tasks.append(
+            send_sms_alert(
+                phone_number=user.phone_number,
                 product_name=item.product_name or "Your tracked item",
                 current_price=current_price,
                 target_price=item.target_price,
@@ -49,8 +61,7 @@ async def send_price_alert(
 
     for i, result in enumerate(results):
         if isinstance(result, Exception):
-            channel = "email" if i == 0 else "telegram"
-            logger.error(f"Alert failed on {channel}: {result}")
+            logger.error(f"Alert failed: {result}")
 
 
 async def send_email_alert(

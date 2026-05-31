@@ -23,6 +23,70 @@
     </div>
   </div>
   <div class="settings-section">
+  <div class="section-title">Notification Channels</div>
+  <div class="card">
+    <form method="POST" action="/settings/notifications">
+      <div style="display:flex; flex-direction:column; gap:16px;">
+
+        <label style="display:flex; align-items:center; justify-content:space-between;">
+          <div>
+            <div style="font-size:14px; font-weight:500;">Email</div>
+            <div style="font-size:12px; color:var(--muted);">Alerts sent to {{ current_user.email }}</div>
+          </div>
+          <input type="checkbox" name="notify_email" value="true"
+            {{ 'checked' if current_user.notify_email }} style="width:18px; height:18px; accent-color:var(--accent);">
+        </label>
+
+        <label style="display:flex; align-items:center; justify-content:space-between;">
+          <div>
+            <div style="font-size:14px; font-weight:500;">Telegram</div>
+            <div style="font-size:12px; color:var(--muted);">
+              {{ 'Linked' if current_user.telegram_chat_id else 'Not connected' }}
+            </div>
+          </div>
+          <input type="checkbox" name="notify_telegram" value="true"
+            {{ 'checked' if current_user.notify_telegram }}
+            {{ '' if current_user.telegram_chat_id else 'disabled' }}
+            style="width:18px; height:18px; accent-color:var(--accent);">
+        </label>
+
+        <label style="display:flex; align-items:center; justify-content:space-between;">
+          <div>
+            <div style="font-size:14px; font-weight:500;">
+              SMS
+              {% if not current_user.is_pro %}
+              <span class="badge badge-gray" style="margin-left:8px;">Pro</span>
+              {% endif %}
+            </div>
+            <div style="font-size:12px; color:var(--muted);">Text message to your phone</div>
+          </div>
+          <input type="checkbox" name="notify_sms" value="true"
+            {{ 'checked' if current_user.notify_sms }}
+            {{ '' if current_user.is_pro else 'disabled' }}
+            style="width:18px; height:18px; accent-color:var(--accent);">
+        </label>
+
+        {% if current_user.is_pro %}
+        <div>
+          <label class="label">Phone Number</label>
+          <div style="display:flex; gap:10px;">
+            <input class="input" type="tel" name="phone_number"
+              placeholder="+1234567890"
+              value="{{ current_user.phone_number or '' }}"
+              style="flex:1;">
+          </div>
+          <p style="font-size:12px; color:var(--muted); margin-top:6px;">Include country code e.g. +1 for US</p>
+        </div>
+        {% endif %}
+
+        <button class="btn btn-primary" type="submit" style="align-self:flex-start;">
+          Save preferences
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+  <div class="settings-section">
     <div class="section-title">Telegram</div>
     <div class="link-box">
       <div>

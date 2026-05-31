@@ -20,6 +20,10 @@ class Settings(BaseSettings):
     PRICE_CHECK_INTERVAL_HOURS: int = 3
     SCRAPER_API_KEY: str = "dda74f5797b4e129896b92f95492efde"
 
+    TWILIO_ACCOUNT_SID: str = ""
+    TWILIO_AUTH_TOKEN: str = ""
+    TWILIO_PHONE_NUMBER: str = ""
+
     class Config:
         env_file = ".env"
 

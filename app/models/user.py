@@ -21,3 +21,9 @@ class User(Base):
     items = relationship("TrackedItem", back_populates="user")
     alerts = relationship("AlertLog", back_populates="user")
     events = relationship("Event", back_populates="user")
+
+    notify_email = Column(Boolean, default=True)
+    notify_telegram = Column(Boolean, default=True)
+    notify_sms = Column(Boolean, default=False)
+    phone_number = Column(Text, nullable=True)
+    phone_verified = Column(Boolean, default=False)

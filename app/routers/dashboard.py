@@ -376,3 +376,23 @@ async def delete_account(request: Request, db: AsyncSession = Depends(get_db)):
     response = RedirectResponse("/login", status_code=302)
     response.delete_cookie("nm_token")
     return response
+
+@router.post("/settings/notifications")
+async def update_notifications(
+    request: Request,
+    notify_email: bool = Form(False),
+    notify_telegram: bool = Form(False),
+    notify_sms: bool = Form(False),
+    db: AsyncSession = Depends(get_db),
+):
+    user = await get_user_from_cookie(request, db)
+    if not user:
+        return RedirectResponse("/login", status_code=302)
+
+    user.notify_email = notify_email
+    user.notify_telegram = notify_telegram
+    if user.is_pro:
+        user.notify_sms = notify_sms
+
+    await db.commit()
+    return RedirectResponse("/settings", status_code=302)
