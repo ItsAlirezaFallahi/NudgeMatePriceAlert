@@ -1,3 +1,5 @@
+from math import asin
+
 from fastapi import APIRouter, Request, Depends, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -9,7 +11,7 @@ from app.models.tracked_item import TrackedItem
 from app.models.price_history import PriceHistory
 from app.models.event import Event
 from app.utils.jwt import decode_access_token
-from app.utils.amazon import extract_asin
+from app.utils.amazon import extract_asin, resolve_and_extract_asin
 from app.services.scraper import scrape_amazon_product
 from decimal import Decimal
 import asyncio
@@ -195,12 +197,13 @@ async def add_item_web(
             "error": msg, "url": url, "target_price": target_price,
         })
 
-    if "amazon.com" not in url:
+    if "amazon.com" not in url and "amzn.to" not in url and "amzn.com" not in url:
         return render_error("Only Amazon URLs are supported right now")
 
-    asin = extract_asin(url)
+    asin = await resolve_and_extract_asin(url)
     if not asin:
         return render_error("Could not find a valid Amazon product in that URL")
+
 
     count_result = await db.execute(
         select(func.count()).select_from(TrackedItem).where(

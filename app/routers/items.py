@@ -1,3 +1,4 @@
+from cmath import asin
 import logging
 import asyncio
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
@@ -12,9 +13,9 @@ from app.models.price_history import PriceHistory
 from app.models.event import Event
 from app.schemas.item import AddItemRequest, ItemResponse, PriceHistoryResponse
 from app.services.scraper import scrape_amazon_product
-from app.utils.amazon import extract_asin
 from sqlalchemy.sql import func as sqlfunc
 from decimal import Decimal
+from app.utils.amazon import extract_asin, resolve_and_extract_asin
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/items", tags=["items"])
@@ -64,10 +65,10 @@ async def add_item(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if "amazon.com" not in payload.url:
+    if "amazon.com" not in payload.url and "amzn.to" not in payload.url and "amzn.com" not in payload.url:
         raise HTTPException(status_code=400, detail="Only Amazon URLs are supported right now")
 
-    asin = extract_asin(payload.url)
+    asin = await resolve_and_extract_asin(payload.url)
     if not asin:
         raise HTTPException(status_code=400, detail="Could not find a valid Amazon product in that URL")
 
