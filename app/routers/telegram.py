@@ -1,3 +1,4 @@
+
 import logging
 from fastapi import APIRouter, Request, HTTPException, Depends
 from telegram import Update, Bot
@@ -82,6 +83,6 @@ async def get_link_token(current_user: User = Depends(get_current_user)):
     token = generate_link_token(str(current_user.id))
     return {
         "token": token,
-        "link_url": f"https://t.me/NudgemateBot?start=link_{token}",
+        "link_url": f"https://t.me/NudgemateAlertBot?start=link_{token}",
         "expires_in": "10 minutes",
     }
