@@ -129,5 +129,11 @@ async def send_telegram_alert(
 
 
 def escape_markdown(text: str) -> str:
-    special = r"\_*[]()~`>#+-=|{}.!"
-    return "".join(f"\\{c}" if c in special else c for c in text)
+    special = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
+    result = ""
+    for c in text:
+        if c in special:
+            result += f"\\{c}"
+        else:
+            result += c
+    return result
