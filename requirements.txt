@@ -16,3 +16,6 @@ jinja2
 python-multipart
 pydantic-settings
 apscheduler
+jinja2==3.1.4
+starlette==0.37.2
+pydantic[email]

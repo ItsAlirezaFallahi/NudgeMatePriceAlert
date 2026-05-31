@@ -1,10 +1,10 @@
 import asyncio
-import random
+import httpx
+import re
 from decimal import Decimal
 from dataclasses import dataclass
-from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeout
-from app.utils.user_agents import get_random_user_agent
-from app.utils.amazon import extract_asin, build_affiliate_url, clean_amazon_url
+from app.utils.amazon import extract_asin, build_affiliate_url
+from app.config import settings
 import logging
 
 logger = logging.getLogger(__name__)
@@ -19,143 +19,117 @@ class ScrapeResult:
     error: str | None = None
 
 
-PRICE_SELECTORS = [
-    "#priceblock_ourprice",
-    "#priceblock_dealprice",
-    "span.a-price.aok-align-center span.a-offscreen",
-    ".a-price .a-offscreen",
-    "#apex_offerDisplay_desktop .a-price .a-offscreen",
-    "#corePriceDisplay_desktop_feature_div .a-price .a-offscreen",
-    "#corePrice_desktop .a-price .a-offscreen",
-    ".priceToPay .a-offscreen",
-    "#sns-base-price",
+PRICE_PATTERNS = [
+    r'"priceAmount":([\d.]+)',
+    r'"price":\s*"?\$?([\d,]+\.[\d]{2})"?',
+    r'class="a-price-whole">(\d+)<',
 ]
-
-TITLE_SELECTORS = [
-    "#productTitle",
-    "#title span",
-    "h1.a-size-large",
-]
-
 
 async def scrape_amazon_product(url: str) -> ScrapeResult:
     asin = extract_asin(url)
     if not asin:
         return ScrapeResult(success=False, error="Could not extract ASIN from URL")
 
-    clean_url = clean_amazon_url(asin)
     affiliate_url = build_affiliate_url(asin)
+    target_url = f"https://www.amazon.com/dp/{asin}"
 
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(
-            headless=True,
-            args=[
-                "--no-sandbox",
-                "--disable-setuid-sandbox",
-                "--disable-dev-shm-usage",
-                "--disable-blink-features=AutomationControlled",
-            ],
-        )
+    scraper_url = (
+        f"http://api.scraperapi.com"
+        f"?api_key={settings.SCRAPER_API_KEY}"
+        f"&url={target_url}"
+        f"&country_code=us"
+        f"&device_type=desktop"
+    )
 
-        context = await browser.new_context(
-            user_agent=get_random_user_agent(),
-            viewport={"width": 1280, "height": 800},
-            locale="en-US",
-            timezone_id="America/New_York",
-            extra_http_headers={
-                "Accept-Language": "en-US,en;q=0.9",
-                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-            },
-        )
+    try:
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.get(scraper_url)
 
-        await context.add_init_script("""
-            Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
-            Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3] });
-        """)
-
-        page = await context.new_page()
-
-        try:
-            await asyncio.sleep(random.uniform(1.0, 3.0))
-            await page.goto(clean_url, wait_until="domcontentloaded", timeout=30000)
-
-            content = await page.content()
-            if "captcha" in content.lower() or "robot" in content.lower():
-                logger.warning(f"CAPTCHA detected for ASIN {asin}")
-                return ScrapeResult(
-                    success=False,
-                    asin=asin,
-                    affiliate_url=affiliate_url,
-                    error="CAPTCHA detected",
-                )
-
-            await asyncio.sleep(random.uniform(1.0, 2.0))
-
-            product_name = None
-            for selector in TITLE_SELECTORS:
-                try:
-                    el = await page.wait_for_selector(selector, timeout=5000)
-                    if el:
-                        text = await el.inner_text()
-                        product_name = text.strip()
-                        if product_name:
-                            break
-                except PlaywrightTimeout:
-                    continue
-
-            current_price = None
-            for selector in PRICE_SELECTORS:
-                try:
-                    el = await page.query_selector(selector)
-                    if el:
-                        text = await el.inner_text()
-                        price = parse_price(text)
-                        if price:
-                            current_price = price
-                            break
-                except Exception:
-                    continue
-
-            if not current_price:
-                logger.warning(f"Could not extract price for ASIN {asin}")
-                return ScrapeResult(
-                    success=False,
-                    asin=asin,
-                    product_name=product_name,
-                    affiliate_url=affiliate_url,
-                    error="Price not found — product may be unavailable",
-                )
-
+        if response.status_code != 200:
+            logger.warning(f"ScraperAPI returned {response.status_code} for ASIN {asin}")
             return ScrapeResult(
-                success=True,
+                success=False,
+                asin=asin,
+                affiliate_url=affiliate_url,
+                error=f"HTTP {response.status_code}",
+            )
+
+        html = response.text
+
+        if "captcha" in html.lower() and len(html) < 5000:
+            logger.warning(f"CAPTCHA still detected for ASIN {asin}")
+            return ScrapeResult(
+                success=False,
+                asin=asin,
+                affiliate_url=affiliate_url,
+                error="CAPTCHA detected",
+            )
+
+        # Extract title
+        product_name = None
+        title_match = re.search(r'id="productTitle"[^>]*>\s*([^<]+)', html)
+        if title_match:
+            product_name = title_match.group(1).strip()
+
+        # Extract price
+        current_price = None
+
+        # Try structured price first
+        price_match = re.search(r'"priceAmount":([\d.]+)', html)
+        if not price_match:
+            price_match = re.search(r'class="a-price-whole">(\d+)', html)
+            if price_match:
+                whole = price_match.group(1)
+                frac_match = re.search(r'class="a-price-fraction">(\d+)', html)
+                frac = frac_match.group(1) if frac_match else "00"
+                try:
+                    current_price = Decimal(f"{whole}.{frac}")
+                except Exception:
+                    pass
+
+        if not current_price and price_match and '"priceAmount"' in html:
+            try:
+                current_price = Decimal(price_match.group(1))
+            except Exception:
+                pass
+
+        # Fallback: look for $XX.XX pattern near price elements
+        if not current_price:
+            matches = re.findall(r'\$(\d{1,4}\.\d{2})', html)
+            if matches:
+                try:
+                    current_price = Decimal(matches[0])
+                except Exception:
+                    pass
+
+        if not current_price:
+            logger.warning(f"Could not extract price for ASIN {asin}")
+            return ScrapeResult(
+                success=False,
                 asin=asin,
                 product_name=product_name,
-                current_price=current_price,
                 affiliate_url=affiliate_url,
+                error="Price not found",
             )
 
-        except PlaywrightTimeout:
-            logger.error(f"Timeout scraping ASIN {asin}")
-            return ScrapeResult(
-                success=False,
-                asin=asin,
-                affiliate_url=affiliate_url,
-                error="Page load timeout",
-            )
-        except Exception as e:
-            logger.error(f"Unexpected error scraping ASIN {asin}: {e}")
-            return ScrapeResult(
-                success=False,
-                asin=asin,
-                affiliate_url=affiliate_url,
-                error=str(e),
-            )
-        finally:
-            await browser.close()
+        logger.info(f"Scraped ASIN {asin}: {product_name} @ ${current_price}")
+        return ScrapeResult(
+            success=True,
+            asin=asin,
+            product_name=product_name,
+            current_price=current_price,
+            affiliate_url=affiliate_url,
+        )
+
+    except httpx.TimeoutException:
+        logger.error(f"Timeout scraping ASIN {asin}")
+        return ScrapeResult(success=False, asin=asin, affiliate_url=affiliate_url, error="Timeout")
+    except Exception as e:
+        logger.error(f"Error scraping ASIN {asin}: {e}")
+        return ScrapeResult(success=False, asin=asin, affiliate_url=affiliate_url, error=str(e))
 
 
 def parse_price(text: str) -> Decimal | None:
-    import re
     text = text.strip().replace(",", "")
     match = re.search(r"\d+\.\d{2}", text)
     if match:

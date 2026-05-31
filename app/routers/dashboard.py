@@ -65,19 +65,19 @@ async def landing(request: Request, db: AsyncSession = Depends(get_db)):
     user = await get_user_from_cookie(request, db)
     if user:
         return RedirectResponse("/dashboard", status_code=302)
-    return templates.TemplateResponse("index.html", context={"request": request, "current_user": None})
+    return templates.TemplateResponse("index.html", {"request": request, "current_user": None})
 
 
 @router.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
-    return templates.TemplateResponse("auth.html", context={
+    return templates.TemplateResponse("auth.html", {
         "request": request, "mode": "login", "current_user": None,
     })
 
 
 @router.get("/register", response_class=HTMLResponse)
 async def register_page(request: Request):
-    return templates.TemplateResponse("auth.html", context={
+    return templates.TemplateResponse("auth.html", {
         "request": request, "mode": "register", "current_user": None,
     })
 
@@ -98,7 +98,7 @@ async def web_login(
     user = result.scalar_one_or_none()
 
     if not user or not user.password_hash or not verify_password(password, user.password_hash):
-        return templates.TemplateResponse("auth.html", context={
+        return templates.TemplateResponse("auth.html", {
             "request": request, "mode": "login",
             "error": "Invalid email or password", "current_user": None,
         })
@@ -121,7 +121,7 @@ async def web_register(
 
     existing = await db.execute(select(User).where(User.email == email))
     if existing.scalar_one_or_none():
-        return templates.TemplateResponse("auth.html", context={
+        return templates.TemplateResponse("auth.html", {
             "request": request, "mode": "register",
             "error": "Email already registered", "current_user": None,
         })
@@ -159,7 +159,7 @@ async def dashboard(request: Request, db: AsyncSession = Depends(get_db)):
     items = result.scalars().all()
     limit = PRO_TIER_LIMIT if user.is_pro else FREE_TIER_LIMIT
 
-    return templates.TemplateResponse("dashboard.html", context={
+    return templates.TemplateResponse("dashboard.html", {
         "request": request,
         "current_user": user,
         "items": items,
@@ -173,7 +173,7 @@ async def add_item_page(request: Request, db: AsyncSession = Depends(get_db)):
     user = await get_user_from_cookie(request, db)
     if not user:
         return RedirectResponse("/login", status_code=302)
-    return templates.TemplateResponse("add_item.html", context={
+    return templates.TemplateResponse("add_item.html", {
         "request": request, "current_user": user,
     })
 
@@ -190,7 +190,7 @@ async def add_item_web(
         return RedirectResponse("/login", status_code=302)
 
     def render_error(msg):
-        return templates.TemplateResponse("add_item.html", context={
+        return templates.TemplateResponse("add_item.html", {
             "request": request, "current_user": user,
             "error": msg, "url": url, "target_price": target_price,
         })
@@ -263,7 +263,7 @@ async def item_detail(item_id: str, request: Request, db: AsyncSession = Depends
     history = history_result.scalars().all()
     lowest = min((h.price for h in history), default=None)
 
-    return templates.TemplateResponse("item_detail.html", context={
+    return templates.TemplateResponse("item_detail.html", {
         "request": request,
         "current_user": user,
         "item": item,
@@ -349,7 +349,7 @@ async def settings_page(request: Request, db: AsyncSession = Depends(get_db)):
     user = await get_user_from_cookie(request, db)
     if not user:
         return RedirectResponse("/login", status_code=302)
-    return templates.TemplateResponse("settings.html", context={
+    return templates.TemplateResponse("settings.html", {
         "request": request, "current_user": user,
     })
 

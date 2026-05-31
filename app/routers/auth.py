@@ -40,7 +40,7 @@ async def register(payload: RegisterRequest, db: AsyncSession = Depends(get_db))
 
     user = User(email=payload.email, password_hash=hash_password(payload.password))
     db.add(user)
-    db.add(Event(email=payload.email, event_type="signup", event_event_metadata={"method": "email"}))
+    db.add(Event(email=payload.email, event_type="signup", event_metadata={"method": "email"}))
     await db.commit()
     await db.refresh(user)
 
@@ -102,7 +102,7 @@ async def google_callback(code: str, db: AsyncSession = Depends(get_db)):
     else:
         user = User(email=email, google_id=google_id)
         db.add(user)
-        db.add(Event(email=email, event_type="signup", event_event_metadata={"method": "google"}))
+        db.add(Event(email=email, event_type="signup", event_metadata={"method": "google"}))
         await db.commit()
         await db.refresh(user)
 
