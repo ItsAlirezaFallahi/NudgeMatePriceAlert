@@ -62,7 +62,7 @@
 <script>
 async function linkTelegram() {
   try {
-    const res = await fetch('/telegram/link-token', { headers: { 'Authorization': 'Bearer ' + (document.cookie.match(/nm_token=([^;]+)/)||[])[1] } });
+    const res = await fetch('/telegram/link-token');
     const data = await res.json();
     document.getElementById('telegram-link-url').href = data.link_url;
     document.getElementById('telegram-link-box').style.display = 'block';
