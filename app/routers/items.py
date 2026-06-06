@@ -11,7 +11,7 @@ from app.models.tracked_item import TrackedItem
 from app.models.price_history import PriceHistory
 from app.models.event import Event
 from app.schemas.item import AddItemRequest, ItemResponse, PriceHistoryResponse
-from app.services.scraper import scrape_amazon_product
+from app.services.scraper import scrape_product
 from sqlalchemy.sql import func as sqlfunc
 from decimal import Decimal
 from app.utils.amazon import extract_asin, resolve_and_extract_asin
@@ -41,7 +41,7 @@ async def scrape_and_update(item_id):
             return
         url = f"https://www.amazon.com/dp/{item.asin}"
 
-    result = await scrape_amazon_product(url)
+    result = await scrape_product(url)
 
     async with AsyncSessionLocal() as db:
         item = await db.get(TrackedItem, item_id)
@@ -64,12 +64,12 @@ async def add_item(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if not any(d in payload.url for d in ["amazon.com", "amzn.to", "amzn.com", "a.co"]):
-        raise HTTPException(status_code=400, detail="Only Amazon URLs are supported right now")
+    if not payload.url.startswith("http"):
+        raise HTTPException(status_code=400, detail="Please enter a valid URL starting with https://")
 
-    asin = await resolve_and_extract_asin(payload.url)
-    if not asin:
-        raise HTTPException(status_code=400, detail="Could not find a valid Amazon product in that URL")
+    asin = None
+    if any(d in payload.url for d in ["amazon.com", "amzn.to", "amzn.com", "a.co"]):
+        asin = await resolve_and_extract_asin(payload.url)
 
     limit = PRO_TIER_LIMIT if current_user.is_pro else FREE_TIER_LIMIT
     count = await get_active_item_count(db, current_user.id)

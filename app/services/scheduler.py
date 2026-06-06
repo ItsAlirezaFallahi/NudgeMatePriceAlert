@@ -9,7 +9,7 @@ from app.database import AsyncSessionLocal
 from app.models.tracked_item import TrackedItem
 from app.models.price_history import PriceHistory
 from app.models.alert_log import AlertLog
-from app.services.scraper import scrape_amazon_product
+from app.services.scraper import scrape_product
 from app.services.notifier import send_price_alert
 from app.config import settings
 
@@ -57,7 +57,7 @@ async def check_all_prices():
 async def check_single_item(item: TrackedItem):
     logger.info(f"Checking item {item.id} — ASIN {item.asin}")
 
-    result = await scrape_amazon_product(item.url)
+    result = await scrape_product(item.url)
 
     async with AsyncSessionLocal() as db:
         db_item = await db.get(TrackedItem, item.id)

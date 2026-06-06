@@ -10,7 +10,7 @@ from app.models.price_history import PriceHistory
 from app.models.event import Event
 from app.utils.jwt import decode_access_token
 from app.utils.amazon import extract_asin, resolve_and_extract_asin
-from app.services.scraper import scrape_amazon_product
+from app.services.scraper import scrape_product
 from decimal import Decimal
 import asyncio
 
@@ -42,7 +42,7 @@ async def scrape_and_update_bg(item_id):
             return
         url = f"https://www.amazon.com/dp/{item.asin}"
 
-    result = await scrape_amazon_product(url)
+    result = await scrape_product(url)
 
     async with AsyncSessionLocal() as db:
         item = await db.get(TrackedItem, item_id)
@@ -195,13 +195,12 @@ async def add_item_web(
             "error": msg, "url": url, "target_price": target_price,
         })
 
-    if not any(d in url for d in ["amazon.com", "amzn.to", "amzn.com", "a.co"]):
-        return render_error("Only Amazon URLs are supported right now")
+    if not url.startswith("http"):
+        return render_error("Please enter a valid URL starting with https://")
 
-    asin = await resolve_and_extract_asin(url)
-    if not asin:
-        return render_error("Could not find a valid Amazon product in that URL")
-
+    asin = None
+    if any(d in url for d in ["amazon.com", "amzn.to", "amzn.com", "a.co"]):
+        asin = await resolve_and_extract_asin(url)
 
     count_result = await db.execute(
         select(func.count()).select_from(TrackedItem).where(
