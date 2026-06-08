@@ -82,7 +82,11 @@ async def check_single_item(item: TrackedItem):
         from sqlalchemy.sql import func
         db_item.last_checked_at = func.now()
 
-        should_alert = await should_send_alert(db_item)
+        should_alert = should_send_alert(
+            current_price=new_price,
+            target_price=db_item.target_price,
+            last_alert_price=db_item.last_alert_price,
+        )
 
         await db.commit()
 
@@ -95,24 +99,21 @@ async def check_single_item(item: TrackedItem):
 
 MEANINGFUL_DROP_THRESHOLD = 0.05  # 5%
 
-async def should_send_alert(item: TrackedItem) -> bool:
-    current_price = item.current_price
-    target_price = item.target_price
-
+def should_send_alert(current_price: Decimal, target_price: Decimal, last_alert_price: Decimal | None) -> bool:
     # Price not below target — no alert
     if current_price > target_price:
         return False
 
     # Never alerted before — alert
-    if item.last_alert_price is None:
+    if last_alert_price is None:
         return True
 
     # Last alert was above target — price dropped below again — alert
-    if item.last_alert_price > target_price:
+    if last_alert_price > target_price:
         return True
 
     # Price dropped 5%+ from last alert price — alert
-    drop_pct = (item.last_alert_price - current_price) / item.last_alert_price
+    drop_pct = (last_alert_price - current_price) / last_alert_price
     if drop_pct >= MEANINGFUL_DROP_THRESHOLD:
         return True
 
