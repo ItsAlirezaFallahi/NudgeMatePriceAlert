@@ -82,32 +82,41 @@ async def check_single_item(item: TrackedItem):
         from sqlalchemy.sql import func
         db_item.last_checked_at = func.now()
 
-        should_alert = (
-            new_price <= db_item.target_price
-            and not await already_alerted_recently(db, db_item.id, new_price)
-        )
+        should_alert = await should_send_alert(db_item)
 
         await db.commit()
 
         if should_alert:
-            logger.info(f"Price drop detected for item {item.id}: {new_price} (target: {db_item.target_price})")
-            await trigger_alert(item, new_price)
+            logger.info(
+                f"Price drop detected for item {item.id}: {new_price} (target: {db_item.target_price})"
+            )
+            await trigger_alert(db_item, new_price)
 
 
-async def already_alerted_recently(db, item_id, price: Decimal) -> bool:
-    from datetime import datetime, timedelta
-    cutoff = datetime.utcnow() - timedelta(hours=24)
+MEANINGFUL_DROP_THRESHOLD = 0.05  # 5%
 
-    result = await db.execute(
-        select(AlertLog)
-        .where(
-            AlertLog.item_id == item_id,
-            AlertLog.price_at_alert <= price,
-            AlertLog.sent_at >= cutoff,
-        )
-        .limit(1)
-    )
-    return result.scalar_one_or_none() is not None
+async def should_send_alert(item: TrackedItem) -> bool:
+    current_price = item.current_price
+    target_price = item.target_price
+
+    # Price not below target — no alert
+    if current_price > target_price:
+        return False
+
+    # Never alerted before — alert
+    if item.last_alert_price is None:
+        return True
+
+    # Last alert was above target — price dropped below again — alert
+    if item.last_alert_price > target_price:
+        return True
+
+    # Price dropped 5%+ from last alert price — alert
+    drop_pct = (item.last_alert_price - current_price) / item.last_alert_price
+    if drop_pct >= MEANINGFUL_DROP_THRESHOLD:
+        return True
+
+    return False
 
 
 async def trigger_alert(item: TrackedItem, price: Decimal):
@@ -117,13 +126,17 @@ async def trigger_alert(item: TrackedItem, price: Decimal):
     try:
         await send_price_alert(user=user, item=item, current_price=price)
         channels_used = ["email"]
-        if user.telegram_chat_id:
+        if user.telegram_chat_id and user.notify_telegram:
             channels_used.append("telegram")
     except Exception as e:
         logger.error(f"Failed to send alert for item {item.id}: {e}")
         return
 
     async with AsyncSessionLocal() as db:
+        db_item = await db.get(TrackedItem, item.id)
+        if db_item:
+            db_item.last_alert_price = price
+
         alert = AlertLog(
             item_id=item.id,
             user_id=user.id,

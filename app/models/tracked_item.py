@@ -15,6 +15,7 @@ class TrackedItem(Base):
     product_name = Column(Text, nullable=True)
     current_price = Column(Numeric(10, 2), nullable=True)
     target_price = Column(Numeric(10, 2), nullable=False)
+    last_alert_price = Column(Numeric(10, 2), nullable=True)
     affiliate_url = Column(Text, nullable=True)
     is_active = Column(Boolean, default=True)
     last_checked_at = Column(TIMESTAMP(timezone=True), nullable=True)
