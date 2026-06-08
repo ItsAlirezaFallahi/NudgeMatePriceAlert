@@ -88,13 +88,77 @@ async def check_single_item(item: TrackedItem):
             last_alert_price=db_item.last_alert_price,
         )
 
+        # Capture all needed data before closing session
+        item_id = db_item.id
+        user_id = item.user.id
+        product_name = db_item.product_name
+        affiliate_url = db_item.affiliate_url or db_item.url
+        target_price = db_item.target_price
+
         await db.commit()
 
-        if should_alert:
-            logger.info(
-                f"Price drop detected for item {item.id}: {new_price} (target: {db_item.target_price})"
-            )
-            await trigger_alert(db_item, new_price)
+    if should_alert:
+        logger.info(f"Price drop detected for item {item_id}: {new_price} (target: {target_price})")
+        await trigger_alert_by_ids(
+            item_id=item_id,
+            user_id=user_id,
+            product_name=product_name,
+            affiliate_url=affiliate_url,
+            current_price=new_price,
+            target_price=target_price,
+        )
+
+
+async def trigger_alert_by_ids(
+    item_id,
+    user_id,
+    product_name: str,
+    affiliate_url: str,
+    current_price: Decimal,
+    target_price: Decimal,
+):
+    from sqlalchemy import select
+    from app.models.user import User
+
+    async with AsyncSessionLocal() as db:
+        user = await db.get(User, user_id)
+        if not user:
+            return
+
+        channels_used = []
+
+        try:
+            # Build a minimal item-like object for the notifier
+            class ItemProxy:
+                pass
+
+            item_proxy = ItemProxy()
+            item_proxy.product_name = product_name
+            item_proxy.affiliate_url = affiliate_url
+            item_proxy.url = affiliate_url
+            item_proxy.target_price = target_price
+
+            await send_price_alert(user=user, item=item_proxy, current_price=current_price)
+            channels_used = ["email"]
+            if user.telegram_chat_id and user.notify_telegram:
+                channels_used.append("telegram")
+        except Exception as e:
+            logger.error(f"Failed to send alert for item {item_id}: {e}")
+            return
+
+        db_item = await db.get(TrackedItem, item_id)
+        if db_item:
+            db_item.last_alert_price = current_price
+
+        alert = AlertLog(
+            item_id=item_id,
+            user_id=user_id,
+            price_at_alert=current_price,
+            channels=channels_used,
+        )
+        db.add(alert)
+        await db.commit()
+        logger.info(f"Alert sent for item {item_id} via {channels_used}")
 
 
 MEANINGFUL_DROP_THRESHOLD = 0.05  # 5%
